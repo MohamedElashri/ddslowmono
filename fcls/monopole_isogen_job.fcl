@@ -1,0 +1,89 @@
+#include "services.fcl"
+#include "IsoGen.fcl"
+#include "G4Gen.fcl"
+#include "ReadoutSim.fcl"
+#include "ImprovedTransport.fcl"
+#include "Filter.fcl"
+#include "Metadata.fcl"
+
+process_name: MonopoleGenerator
+
+services:
+{
+  TFileService: { fileName: "mono_gen_hist.root" closeFileFast: false }
+  TimeTracker: {}
+  RandomNumberGenerator: {} #ART native random number generator
+  @table::standard_services
+}
+
+services.Geometry: @local::fd_geo
+
+source:
+{
+  module_type: EmptyEvent
+  maxEvents:   1000
+  firstRun:    18323
+  firstSubRun: 1
+  firstEvent:  1
+}
+
+physics:
+{
+  producers:
+  {
+    generator: @local::standard_isop
+    geantgen:  @local::standard_geant4
+    photrans:  @local::standard_photrans
+    daq:       @local::standard_rsim
+    rns:       { module_type: "RandomNumberSaver" }
+  }
+
+  simulate: [ generator, geantgen, photrans, daq, rns ] 
+  out:      [ writer ]
+}
+
+outputs:
+{
+  writer:
+  {
+    module_type: RootOutput
+    fileName:    "Monopole_MC.root"
+  }
+}
+
+physics.producers.daq.fd.NumClockticksInSpill:    80000  # = 5 ms
+physics.producers.daq.fd.ScaleEmptyCellNoiseRate: 0
+physics.producers.daq.fd.DoFlashers:              true
+physics.producers.daq.fd.ForceGain:               100
+
+physics.producers.geantgen.G4AlgPSet.BirksConstant:  0.01155
+physics.producers.geantgen.G4AlgPSet.G4PhysListName: " QGSP_BERT ; g4n::NovaG4MonopolePhysics ( /monopole/setup 1. 0. 1.0e16 GeV ) (  /monopole/magCharge 1 , /monopole/elCharge 0 )"
+
+# The following will stop the simulation when the monopole goes out of the Far Detector.
+physics.producers.geantgen.G4AlgPSet.AddedUserActions:  ["g4n::RockCutterAction" ]
+physics.producers.geantgen.G4AlgPSet.RockCutterAction:{ 
+     		Verbose: 0
+     		X0:0     #cm
+     		Y0:0     
+     		Z0:3000
+     		X_max: 800.0 #cm
+     		X_min: -800.0
+     		Y_max: 800.0
+     		Y_min:  -800.0
+     		Z_max:  6000.0
+     		Z_min:   -20
+        StopTrackOutofBox: 42
+}
+
+physics.producers.generator.PDG:    [ 42 ]     # = Monopole
+physics.producers.generator.P0:     [ 1.e13 ]  # = (m * beta) / sqrt(1 - beta * beta)
+physics.producers.generator.SigmaP: [ 0 ]
+physics.producers.generator.T0:     [ 2.5e6 ]  # = 2.5 ms
+physics.producers.generator.SigmaT: [ 2.5e6 ]  # = 2.5 ms
+
+physics.producers.photrans.fd.XViewFactor:   0.6374
+physics.producers.photrans.fd.YViewFactor:   0.5546
+physics.producers.photrans.fd.PhotonsPerMeV: 3151.04
+physics.producers.photrans.fd.CerenkovEff:   0.8404
+physics.producers.photrans.fd.AttenPars:     [ 0.4493, 203.6, 0.5507, 755.4 ]
+physics.producers.photrans.fd.Step:          0.1

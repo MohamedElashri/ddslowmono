@@ -1,0 +1,105 @@
+#Author:Enhao Song es4re@virginia.edu
+# Do event mixing. Use monopole mc as main file and cosmic data as secondary file. set RawDigit::IsMC(false) and let calibrator use real data calibration constant.
+#
+#include "services.fcl"
+#include "MergeDaqCollections.fcl"
+#include "ReadoutSim.fcl"
+#include "ImprovedTransport.fcl"
+#include "OccupiedSpillFilter.fcl"
+#include "SNEWSFileList.fcl"
+#include "BackTracker.fcl"
+#author Enhao Song es4re@virginia.edu
+
+# Give this job a name.
+process_name: EventMixer
+
+source:
+{
+  module_type: RootInput
+  fileNames:   [ "/nova/ana/exotics_ana/monopole/mc/monopole_mc_isop_n1000_beta1e-1.root" ]
+  maxEvents:   1000
+}
+
+services:
+{
+  # Load the service that manages root files for histograms.
+  TFileService: { fileName: "eventmixer_hist.root" }
+  scheduler:    { wantTracer: false wantSummary: true }
+  message:      @local::standard_out
+  TimeTracker: {}
+  RandomNumberGenerator: {}  #ART native random numbe generator
+  @table::standard_services
+  BackTracker: @local::standard_backtracker
+}
+
+
+outputs:
+{
+  out1:	
+  {	
+   module_type: RootOutput
+
+   #fileName:"/nova/ana/exotics_ana/monopole/mergedmc/monopole_isop_n1000_beta1e-1_and_snews.root"
+   fileName:"monopole_isop_n1000_beta1e-1_and_snews.root"
+#default file name, can override from commandline with -o or --output
+  outputCommands: [ "keep *_*_*_*",
+	                  "drop rawdata::RawDigits_daq_*_MonopoleGenerator",
+                    "drop *_singlemixer_*_EventMixer"
+#                    "drop *_photrans_*_MonopoleGenerator",
+#                    "drop *_geantgen_*_MonopoleGenerator"
+#                    "drop simb::MCTruths_generator_*_MonopoleGenerator"
+                   ]
+
+
+   fastCloning: false
+  } 
+}
+
+
+physics:
+{
+  producers:
+  {
+    daq:
+    {
+      # These settings correspond to monopole_daqmerge that is available
+      # in the development version of MergeDaqCollections.fcl 
+      module_type:                 "MergeDaqCollections"
+      FirstDaqCollection:          "daq"
+      FirstCollectionIsMC:         true
+      RemoveFirstCollectionNoise:  true
+
+      SecondCollection:            "singlemixer"
+      SecondCollectionIsMC:        false
+      RemoveSecondCollectionNoise: false
+
+      InstanceLabel:               ""
+    }
+  }
+
+
+  filters: 
+  {
+    singlemixer: 
+    {
+      # Parameters for the MixFilter template
+      module_type:    MixSimAndRealEvents
+      #snewsfilelist for gain=100
+      fileNames:      @local::snewsfilelist
+      #fileNames:     [ "xroot://fndca1.fnal.gov:1094/pnfs/fnal.gov/usr/nova/production/raw2root/S15-03-11/fardet/000188/18870/all/fardet_r00018870_s47_DDsnews_S15-03-11_v1_data.artdaq.root"]
+      wrapFiles:      true
+      readMode:       "random" #default is "sequential", when use sequential we can skip the first 2 events in snews file which are 200us long. Then we use only 5ms long events to overlay with monopole events.
+      #readMode: "sequential"
+      seed:           [ 24580 ]
+
+      # Parameters for the MixDetail class
+      daqModuleLabel: "daq"
+    }
+  }
+  p1: [ singlemixer, daq ]
+  e1: [ out1 ]
+
+  trigger_paths: [ p1 ]
+  end_paths:     [ e1 ]
+
+}

@@ -1,0 +1,110 @@
+#include "services.fcl"
+#include "SingleGen.fcl"
+#include "IsoGen.fcl"
+#include "G4Gen.fcl"
+#include "ReadoutSim.fcl"
+#include "ImprovedTransport.fcl"
+
+process_name: MonopoleGenerator
+
+services:                  @local::standard_services
+services.Geometry:         @local::fd_geo
+services.TFileService.fileName: "Monopole_MC_Hist.root"
+services.RandomNumberGenerator: {}
+
+source:
+{
+  module_type: EmptyEvent
+  maxEvents:   10000
+  firstRun:    18322
+  firstSubRun: 1
+  firstEvent:  1
+}
+
+physics:
+{
+  producers:
+  {
+    # specified direction:
+    generator: @local::standard_singlep
+    # isotropic generation:
+    # generator: @local::standard_isop
+    geantgen:  @local::standard_geant4
+    photrans:  @local::standard_photrans
+   # daq:       @local::noiseless_rsim
+    daq:       @local::standard_rsim	 
+    rns:       { module_type: "RandomNumberSaver" }
+  }
+
+  simulate: [ generator, geantgen, photrans, daq, rns ] 
+  out:      [ writer ]
+}
+
+outputs:
+{
+  writer:
+  {
+    module_type: RootOutput
+    fileName:    "Monopole_MC.root"
+  }
+}
+
+# physics.producers.daq.fd.NumClockticksInSpill: 80000     # = 5 ms
+physics.producers.daq.fd.ScaleEmptyCellNoiseRate: 0     # no noise in empty cell
+physics.producers.daq.fd.DoFlashers:              true  # simulate FEB sag
+physics.producers.daq.fd.ForceGain:               100
+physics.producers.daq.fd.ASICPreAmpTime:          10000 # ns
+
+# get ASIC traces for specific plane/cell pairs: 
+# physics.producers.daq.TracePlanes: [ 200 ]
+# physics.producers.daq.TraceCells:  [ 192 ]
+
+physics.producers.photrans.UseCutOffTime: false
+physics.producers.photrans.CutOffTime:    382 # ns
+
+
+######################
+# Generator Settings #
+######################
+# General (IsoP and SingleP):
+#############################
+physics.producers.generator.Seed: 0
+# physics.producers.generator.T0:                [ 2.5e6 ] # = 2.5 ms
+# physics.producers.generator.SigmaT:            [ 2.5e6 ] # = 2.5 ms
+
+# Monopole:
+physics.producers.geantgen.G4AlgPSet.G4PhysListName: " QGSP_BERT ; g4n::NovaG4MonopolePhysics ( /monopole/setup 1. 0. 1.0e16 GeV ) (  /monopole/magCharge 1 , /monopole/elCharge 0 )"
+physics.producers.generator.PDG:               [ 42 ]    # = Monopole
+# p = mv = 1e16 * beta (non-relativistic)
+# physics.producers.generator.P0:                [ 1.e13 ] # -> beta = 10^-3
+# physics.producers.generator.P0:                [ 5.01e12 ] # -> beta = 10^-3.3
+# physics.producers.generator.P0:                [ 3.16e12 ] # -> beta = 10^-3.5
+physics.producers.generator.P0:                [ 1.e12 ] # -> beta = 10^-4
+
+# Muon:
+# physics.producers.generator.PDG:               [ 13 ]   # = Muon
+# physics.producers.generator.P0:                [ 20 ]    #  GeV
+
+physics.producers.generator.SigmaP:            [ 0 ]
+physics.producers.generator.SigmaP2:           [ 0 ]
+
+
+# SingleP Only:
+###############
+physics.producers.generator.X0:                [ 2.0 ]
+physics.producers.generator.Y0:                [ 2.0 ]
+physics.producers.generator.Z0:                [ 1000.0 ]
+physics.producers.generator.CosZ0:             [ 1.0 ]
+
+physics.producers.generator.SigmaX:            [ 0 ]
+physics.producers.generator.SigmaY:            [ 0 ]
+physics.producers.generator.SigmaZ:            [ 0 ]
+physics.producers.generator.SigmaX2:           [ 0 ]
+physics.producers.generator.SigmaY2:           [ 0 ]
+physics.producers.generator.SigmaZ2:           [ 0 ]
+
+physics.producers.generator.SigmaPhiXY:        [ 0 ]
+physics.producers.generator.SigmaPhiXY2:       [ 0 ]
+
+physics.producers.generator.SigmaCosZ:         [ 0 ]
+physics.producers.generator.SigmaCosZ2:        [ 0 ]
